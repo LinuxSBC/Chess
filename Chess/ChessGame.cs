@@ -50,8 +50,8 @@ public class ChessGame : Game
 
     public int maxSize;
 
-    public GraphicsDeviceManager _graphics;
-    public SpriteBatch _spriteBatch;
+    private GraphicsDeviceManager _graphics;
+    private SpriteBatch _spriteBatch;
 
     private ChessPiece _pickedUpPiece;
     private MouseState _mouseState;
@@ -164,31 +164,49 @@ public class ChessGame : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
+        
+        var scale = maxSize / 8f;
 
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
-        var scale = maxSize / 8f;
-        if (mouseClicked && _pickedUpPiece == null && _mouseState.X > 0 && _mouseState.X < maxSize && _mouseState.Y > 0 && _mouseState.Y < maxSize)
-        {
-            var mouseSquare = new Vector2((int) (_mouseState.X / scale), (int) (_mouseState.Y / scale));
+        var mouseSquare = new Vector2((int) (_mouseState.X / scale), (int) (_mouseState.Y / scale));
+
+        if (mouseClicked && _pickedUpPiece == null && 
+            _mouseState.X > 0 && _mouseState.X < maxSize && 
+            _mouseState.Y > 0 && _mouseState.Y < maxSize &&
+            Pieces.Any(p => p.Position == mouseSquare))
+        { // Pick up the piece
             _pickedUpPiece = Pieces.FirstOrDefault(p => p.Position == mouseSquare);
             _pickedUpPiece.BeingDragged = true;
         }
-        else if (mouseClicked && _pickedUpPiece != null)
-        {
-            var mouseSquare = new Vector2((int) (_mouseState.X / scale), (int) (_mouseState.Y / scale));
-            _pickedUpPiece.Position = mouseSquare;
+        else if (!mouseClicked && _pickedUpPiece != null)
+        { // Drop the piece
+            if (CanPlace(_pickedUpPiece, mouseSquare))
+                _pickedUpPiece.Position = mouseSquare;
             _pickedUpPiece.BeingDragged = false;
             _pickedUpPiece = null;
         }
-
+        
         base.Update(gameTime);
     }
-
+    
+    private bool InBounds(Vector2 position)
+    {
+        return position.X >= 0 && position.X < 8 && position.Y >= 0 && position.Y < 8;
+    }
+    
+    private bool CanPlace(ChessPiece piece, Vector2 position)
+    {
+        if (!InBounds(position))
+            return false;
+        if (Pieces.Any(p => p.Position == position))
+            return false;
+        return true;
+    }
+    
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
-        // _board.Draw(gameTime);
         maxSize = (Window.ClientBounds.Height > Window.ClientBounds.Width) switch
         {
             true => Window.ClientBounds.Width,
@@ -196,7 +214,6 @@ public class ChessGame : Game
         };
         var scale = maxSize / 8f;
         
-        // TODO: Add your drawing code here
         _spriteBatch.Begin(SpriteSortMode.FrontToBack, null);
         _spriteBatch.Draw(chessBoard, 
             new Rectangle(0, 0, maxSize, maxSize), 

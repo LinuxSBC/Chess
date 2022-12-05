@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -26,7 +27,9 @@ public class ChessPiece
     
     public Vector2 Position { get; set; }
     
-    public bool[] PossibleMoves { get; }
+    public Vector2 LastPosition { get; set; }
+    
+    public List<Vector2> PossibleMoves { get; set; }
 
     public PieceType Type { get; set; }
     public PieceColor Color { get;}
@@ -40,7 +43,7 @@ public class ChessPiece
         Color = color;
         Texture = texture;
         Position = position;
-        PossibleMoves = new bool[64];
+        LastPosition = position;
         HasMoved = false;
         BeingDragged = false;
     }
