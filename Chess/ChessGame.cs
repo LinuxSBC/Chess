@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,48 +9,50 @@ namespace Chess;
 
 public class ChessGame : Game
 {
-    public static Texture2D chessBoard;
+    private static Texture2D _chessBoard;
 
-    public ChessPiece BlackRook1;
-    public ChessPiece BlackKnight1;
-    public ChessPiece BlackBishop1;
-    public ChessPiece BlackQueen;
-    public ChessPiece BlackKing;
-    public ChessPiece BlackBishop2;
-    public ChessPiece BlackKnight2;
-    public ChessPiece BlackRook2;
-    public ChessPiece BlackPawn1;
-    public ChessPiece BlackPawn2;
-    public ChessPiece BlackPawn3;
-    public ChessPiece BlackPawn4;
-    public ChessPiece BlackPawn5;
-    public ChessPiece BlackPawn6;
-    public ChessPiece BlackPawn7;
-    public ChessPiece BlackPawn8;
+    private ChessPiece _blackRook1;
+    private ChessPiece _blackKnight1;
+    private ChessPiece _blackBishop1;
+    private ChessPiece _blackQueen;
+    private ChessPiece _blackKing;
+    private ChessPiece _blackBishop2;
+    private ChessPiece _blackKnight2;
+    private ChessPiece _blackRook2;
+    private ChessPiece _blackPawn1;
+    private ChessPiece _blackPawn2;
+    private ChessPiece _blackPawn3;
+    private ChessPiece _blackPawn4;
+    private ChessPiece _blackPawn5;
+    private ChessPiece _blackPawn6;
+    private ChessPiece _blackPawn7;
+    private ChessPiece _blackPawn8;
     
-    public ChessPiece WhiteRook1;
-    public ChessPiece WhiteKnight1;
-    public ChessPiece WhiteBishop1;
-    public ChessPiece WhiteQueen;
-    public ChessPiece WhiteKing;
-    public ChessPiece WhiteBishop2;
-    public ChessPiece WhiteKnight2;
-    public ChessPiece WhiteRook2;
-    public ChessPiece WhitePawn1;
-    public ChessPiece WhitePawn2;
-    public ChessPiece WhitePawn3;
-    public ChessPiece WhitePawn4;
-    public ChessPiece WhitePawn5;
-    public ChessPiece WhitePawn6;
-    public ChessPiece WhitePawn7;
-    public ChessPiece WhitePawn8;
+    private ChessPiece _whiteRook1;
+    private ChessPiece _whiteKnight1;
+    private ChessPiece _whiteBishop1;
+    private ChessPiece _whiteQueen;
+    private ChessPiece _whiteKing;
+    private ChessPiece _whiteBishop2;
+    private ChessPiece _whiteKnight2;
+    private ChessPiece _whiteRook2;
+    private ChessPiece _whitePawn1;
+    private ChessPiece _whitePawn2;
+    private ChessPiece _whitePawn3;
+    private ChessPiece _whitePawn4;
+    private ChessPiece _whitePawn5;
+    private ChessPiece _whitePawn6;
+    private ChessPiece _whitePawn7;
+    private ChessPiece _whitePawn8;
     
-    public List<ChessPiece> BlackPieces;
-    public List<ChessPiece> WhitePieces;
-    public List<ChessPiece> Pieces;
+    private List<ChessPiece> _blackPieces;
+    private List<ChessPiece> _whitePieces;
+    private List<ChessPiece> _pieces;
 
-    public int maxSize;
+    private int _maxSize;
+    private static double _scale;
 
+    // ReSharper disable once NotAccessedField.Local
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
@@ -65,9 +68,6 @@ public class ChessGame : Game
 
     protected override void Initialize()
     {
-        // TODO: Add your initialization logic here
-        // ChessBoard board = new ChessBoard();
-        // board.CreateBoard();
         Window.Title = "Chess";
         Window.AllowUserResizing = true;
 
@@ -78,116 +78,153 @@ public class ChessGame : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         
-        chessBoard = Content.Load<Texture2D>("ChessBoard");
+        _chessBoard = Content.Load<Texture2D>("ChessBoard");
 
-        BlackRook1 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
+        _blackRook1 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
             new Vector2(0, 0));
-        BlackKnight1 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKnight"), 
+        _blackKnight1 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKnight"), 
             new Vector2(1, 0));
-        BlackBishop1 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackBishop"), 
+        _blackBishop1 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackBishop"), 
             new Vector2(2, 0));
-        BlackQueen = new(ChessPiece.PieceType.Queen, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackQueen"), 
+        _blackQueen = new(ChessPiece.PieceType.Queen, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackQueen"), 
             new Vector2(3, 0));
-        BlackKing = new(ChessPiece.PieceType.King, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKing"), 
+        _blackKing = new(ChessPiece.PieceType.King, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKing"), 
             new Vector2(4, 0));
-        BlackBishop2 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackBishop"), 
+        _blackBishop2 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackBishop"), 
             new Vector2(5, 0));
-        BlackKnight2 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKnight"), 
+        _blackKnight2 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackKnight"), 
             new Vector2(6, 0));
-        BlackRook2 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
+        _blackRook2 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
             new Vector2(7, 0));
-        BlackPawn1 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn1 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(0, 1));
-        BlackPawn2 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn2 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(1, 1));
-        BlackPawn3 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn3 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(2, 1));
-        BlackPawn4 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn4 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(3, 1));
-        BlackPawn5 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn5 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(4, 1));
-        BlackPawn6 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn6 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(5, 1));
-        BlackPawn7 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn7 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(6, 1));
-        BlackPawn8 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
+        _blackPawn8 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.Black, Content.Load<Texture2D>("BlackPawn"), 
             new Vector2(7, 1));
         
-        WhiteRook1 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteRook"),
+        _whiteRook1 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteRook"),
             new Vector2(0, 7));
-        WhiteKnight1 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKnight"),
+        _whiteKnight1 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKnight"),
             new Vector2(1, 7));
-        WhiteBishop1 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteBishop"),
+        _whiteBishop1 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteBishop"),
             new Vector2(2, 7));
-        WhiteQueen = new(ChessPiece.PieceType.Queen, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteQueen"),
+        _whiteQueen = new(ChessPiece.PieceType.Queen, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteQueen"),
             new Vector2(3, 7));
-        WhiteKing = new(ChessPiece.PieceType.King, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKing"),
+        _whiteKing = new(ChessPiece.PieceType.King, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKing"),
             new Vector2(4, 7));
-        WhiteBishop2 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteBishop"),
+        _whiteBishop2 = new(ChessPiece.PieceType.Bishop, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteBishop"),
             new Vector2(5, 7));
-        WhiteKnight2 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKnight"),
+        _whiteKnight2 = new(ChessPiece.PieceType.Knight, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteKnight"),
             new Vector2(6, 7));
-        WhiteRook2 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteRook"),
+        _whiteRook2 = new(ChessPiece.PieceType.Rook, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhiteRook"),
             new Vector2(7, 7));
-        WhitePawn1 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn1 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(0, 6));
-        WhitePawn2 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn2 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(1, 6));
-        WhitePawn3 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn3 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(2, 6));
-        WhitePawn4 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn4 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(3, 6));
-        WhitePawn5 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn5 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(4, 6));
-        WhitePawn6 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn6 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(5, 6));
-        WhitePawn7 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn7 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(6, 6));
-        WhitePawn8 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+        _whitePawn8 = new(ChessPiece.PieceType.Pawn, ChessPiece.PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
             new Vector2(7, 6));
         
-        BlackPieces = new List<ChessPiece>
+        _blackPieces = new List<ChessPiece>
         {
-            BlackRook1, BlackKnight1, BlackBishop1, BlackQueen, BlackKing, BlackBishop2, BlackKnight2, BlackRook2,
-            BlackPawn1, BlackPawn2, BlackPawn3, BlackPawn4, BlackPawn5, BlackPawn6, BlackPawn7, BlackPawn8
+            _blackRook1, _blackKnight1, _blackBishop1, _blackQueen, _blackKing, _blackBishop2, _blackKnight2, _blackRook2,
+            _blackPawn1, _blackPawn2, _blackPawn3, _blackPawn4, _blackPawn5, _blackPawn6, _blackPawn7, _blackPawn8
         };
-        WhitePieces = new List<ChessPiece>
+        _whitePieces = new List<ChessPiece>
         {
-            WhiteRook1, WhiteKnight1, WhiteBishop1, WhiteQueen, WhiteKing, WhiteBishop2, WhiteKnight2, WhiteRook2,
-            WhitePawn1, WhitePawn2, WhitePawn3, WhitePawn4, WhitePawn5, WhitePawn6, WhitePawn7, WhitePawn8
+            _whiteRook1, _whiteKnight1, _whiteBishop1, _whiteQueen, _whiteKing, _whiteBishop2, _whiteKnight2, _whiteRook2,
+            _whitePawn1, _whitePawn2, _whitePawn3, _whitePawn4, _whitePawn5, _whitePawn6, _whitePawn7, _whitePawn8
         };
-        Pieces = Enumerable.Concat(BlackPieces, WhitePieces).ToList();
+        _pieces = Enumerable.Concat(_blackPieces, _whitePieces).ToList();
     }
 
     protected override void Update(GameTime gameTime)
     {
+        _scale = _maxSize / 8f;
+        
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-        
-        var scale = maxSize / 8f;
 
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
-        var mouseSquare = new Vector2((int) (_mouseState.X / scale), (int) (_mouseState.Y / scale));
+        var mouseSquare = new Vector2((int) (_mouseState.X / _scale), (int) (_mouseState.Y / _scale));
 
         if (mouseClicked && _pickedUpPiece == null && 
-            _mouseState.X > 0 && _mouseState.X < maxSize && 
-            _mouseState.Y > 0 && _mouseState.Y < maxSize &&
-            Pieces.Any(p => p.Position == mouseSquare))
-        { // Pick up the piece
-            _pickedUpPiece = Pieces.FirstOrDefault(p => p.Position == mouseSquare);
-            _pickedUpPiece.BeingDragged = true;
+            _mouseState.X > 0 && _mouseState.X < _maxSize && 
+            _mouseState.Y > 0 && _mouseState.Y < _maxSize &&
+            _pieces.Any(p => p.Position == mouseSquare))
+        {
+            // Pick up the piece
+            _pickedUpPiece = _pieces.FirstOrDefault(p => p.Position == mouseSquare);
+            if (_pickedUpPiece != null) _pickedUpPiece.BeingDragged = true;
         }
         else if (!mouseClicked && _pickedUpPiece != null)
         { // Drop the piece
-            if (CanPlace(_pickedUpPiece, mouseSquare))
-                _pickedUpPiece.Position = mouseSquare;
+            Place(_pickedUpPiece, mouseSquare);
+
             _pickedUpPiece.BeingDragged = false;
             _pickedUpPiece = null;
         }
         
         base.Update(gameTime);
+    }
+    
+    private void Place(ChessPiece piece, Vector2 position)
+    {
+        if (!CanPlace(piece, position)) return;
+        if (!Capture(piece, position)) return;
+
+        piece.Position = position;
+
+        if (!piece.HasMoved)
+            piece.HasMoved = true;
+
+        if (piece.Type == ChessPiece.PieceType.Pawn && (position.Y == 0 || (int) position.Y == 7))
+        { // TODO: Add choice for promotion
+            piece.Type = ChessPiece.PieceType.Queen;
+            piece.Texture = piece.Color == ChessPiece.PieceColor.Black
+                ? Content.Load<Texture2D>("BlackQueen")
+                : Content.Load<Texture2D>("WhiteQueen");
+        }
+    }
+
+    private bool Capture(ChessPiece piece, Vector2 position)
+    {
+        if (!CanPlace(piece, position)) return false;
+        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
+        if (pieceToTake != null && pieceToTake.Color != piece.Color)
+        {
+            if (pieceToTake.Color == ChessPiece.PieceColor.Black)
+                _blackPieces.Remove(pieceToTake);
+            else
+                _whitePieces.Remove(pieceToTake);
+
+            _pieces.Remove(pieceToTake);
+        }
+
+        return true;
     }
     
     private bool InBounds(Vector2 position)
@@ -199,36 +236,44 @@ public class ChessGame : Game
     {
         if (!InBounds(position))
             return false;
-        if (Pieces.Any(p => p.Position == position))
+        if (_pieces.Any(p => p.Position == position && p.Color == piece.Color))
             return false;
+        if (!piece.CanMoveTo(position))
+            return false;
+        if (piece.Type == ChessPiece.PieceType.Pawn)
+            if (!(Math.Abs((int) position.X - (int) piece.Position.X) == 1 &&
+                Math.Abs((int) position.Y - (int) piece.Position.Y) == 1) && 
+                _pieces.Any(p => p.Position == position))
+                return false;
         return true;
     }
     
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
-        maxSize = (Window.ClientBounds.Height > Window.ClientBounds.Width) switch
+        _maxSize = (Window.ClientBounds.Height > Window.ClientBounds.Width) switch
         {
             true => Window.ClientBounds.Width,
             false => Window.ClientBounds.Height
         };
-        var scale = maxSize / 8f;
         
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, null);
-        _spriteBatch.Draw(chessBoard, 
-            new Rectangle(0, 0, maxSize, maxSize), 
+        _scale = _maxSize / 8f;
+        
+        _spriteBatch.Begin(SpriteSortMode.FrontToBack);
+        _spriteBatch.Draw(_chessBoard, 
+            new Rectangle(0, 0, _maxSize, _maxSize), 
             null, 
             Color.White, 
             0f, 
             new Vector2(0, 0), 
             SpriteEffects.None, 
             0f);
-        foreach (var piece in Pieces)
+        foreach (var piece in _pieces)
         {
             if (!piece.BeingDragged)
                 _spriteBatch.Draw(piece.Texture,
-                    new Rectangle((int) (piece.Position.X * scale), (int) (piece.Position.Y * scale), (int) scale,
-                        (int) scale),
+                    new Rectangle((int) (piece.Position.X * _scale), (int) (piece.Position.Y * _scale), (int) _scale,
+                        (int) _scale),
                     null,
                     Color.White,
                     0f,
@@ -237,8 +282,8 @@ public class ChessGame : Game
                     0.1f);
             else
                 _spriteBatch.Draw(piece.Texture,
-                    new Rectangle(_mouseState.X - (int) scale / 2, _mouseState.Y - (int) scale / 2, 
-                        (int) scale, (int) scale),
+                    new Rectangle(_mouseState.X - (int) _scale / 2, _mouseState.Y - (int) _scale / 2, 
+                        (int) _scale, (int) _scale),
                     null,
                     Color.White,
                     0f,
