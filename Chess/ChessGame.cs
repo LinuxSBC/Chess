@@ -50,7 +50,6 @@ public class ChessGame : Game
     private List<ChessPiece> _pieces;
 
     private int _maxSize;
-    private static double _scale;
 
     // ReSharper disable once NotAccessedField.Local
     private GraphicsDeviceManager _graphics;
@@ -161,15 +160,13 @@ public class ChessGame : Game
 
     protected override void Update(GameTime gameTime)
     {
-        _scale = _maxSize / 8f;
-        
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
-        var mouseSquare = new Vector2((int) (_mouseState.X / _scale), (int) (_mouseState.Y / _scale));
+        var mouseSquare = ToChessGrid(_mouseState.X, _mouseState.Y);
 
         if (mouseClicked && _pickedUpPiece == null && 
             _mouseState.X > 0 && _mouseState.X < _maxSize && 
@@ -189,6 +186,38 @@ public class ChessGame : Game
         }
         
         base.Update(gameTime);
+    }
+    
+    private Vector2 ToChessGrid(Vector2 position)
+    {
+        var scale = _maxSize / 8f;
+        return new Vector2((int) (position.X / scale), (int) (position.Y / scale));
+    }
+        
+    private Vector2 ToScreenSpace(Vector2 position)
+    {
+        var scale = _maxSize / 8f;
+        return new Vector2(position.X * scale, position.Y * scale);
+    }
+    
+    private float ToChessGrid(float position)
+    {
+        return ToChessGrid(new Vector2(position, 0)).X;
+    }
+    
+    private Vector2 ToChessGrid(float x, float y)
+    {
+        return ToChessGrid(new Vector2(x, y));
+    }
+
+    private float ToScreenSpace(float position)
+    {
+        return ToScreenSpace(new Vector2(position, 0)).X;
+    }
+    
+    private Vector2 ToScreenSpace(float x, float y)
+    {
+        return ToScreenSpace(new Vector2(x, y));
     }
     
     private void Place(ChessPiece piece, Vector2 position)
@@ -257,8 +286,6 @@ public class ChessGame : Game
             false => Window.ClientBounds.Height
         };
         
-        _scale = _maxSize / 8f;
-        
         _spriteBatch.Begin(SpriteSortMode.FrontToBack);
         _spriteBatch.Draw(_chessBoard, 
             new Rectangle(0, 0, _maxSize, _maxSize), 
@@ -272,8 +299,9 @@ public class ChessGame : Game
         {
             if (!piece.BeingDragged)
                 _spriteBatch.Draw(piece.Texture,
-                    new Rectangle((int) (piece.Position.X * _scale), (int) (piece.Position.Y * _scale), (int) _scale,
-                        (int) _scale),
+                    new Rectangle((int) ToScreenSpace(piece.Position.X), 
+                        (int) ToScreenSpace(piece.Position.Y), 
+                        (int) ToScreenSpace(1), (int) ToScreenSpace(1)),
                     null,
                     Color.White,
                     0f,
@@ -282,8 +310,9 @@ public class ChessGame : Game
                     0.1f);
             else
                 _spriteBatch.Draw(piece.Texture,
-                    new Rectangle(_mouseState.X - (int) _scale / 2, _mouseState.Y - (int) _scale / 2, 
-                        (int) _scale, (int) _scale),
+                    new Rectangle(_mouseState.X - (int) ToScreenSpace(0.5f), 
+                        _mouseState.Y - (int) ToScreenSpace(0.5f), 
+                        (int) ToScreenSpace(1), (int) ToScreenSpace(1)),
                     null,
                     Color.White,
                     0f,
