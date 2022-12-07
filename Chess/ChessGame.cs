@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Schema;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -222,8 +223,9 @@ public class ChessGame : Game
     
     private void Place(ChessPiece piece, Vector2 position)
     {
-        if (!CanPlace(piece, position)) return;
-        if (!Capture(piece, position)) return;
+        if (!CanMove(piece, position)) return;
+
+        if (CanCapture(piece, position)) Capture(piece, position);
 
         piece.Position = position;
 
@@ -239,44 +241,132 @@ public class ChessGame : Game
         }
     }
 
-    private bool Capture(ChessPiece piece, Vector2 position)
+    private void Capture(ChessPiece piece, Vector2 position)
     {
-        if (!CanPlace(piece, position)) return false;
+        if (!CanMove(piece, position) || !CanCapture(piece, position)) return;
+        
         var pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
-        if (pieceToTake != null && pieceToTake.Color != piece.Color)
-        {
-            if (pieceToTake.Color == ChessPiece.PieceColor.Black)
-                _blackPieces.Remove(pieceToTake);
-            else
-                _whitePieces.Remove(pieceToTake);
+        if (pieceToTake.Color == ChessPiece.PieceColor.Black)
+            _blackPieces.Remove(pieceToTake);
+        else
+            _whitePieces.Remove(pieceToTake);
 
-            _pieces.Remove(pieceToTake);
-        }
+        _pieces.Remove(pieceToTake);
+    }
+    
+    private static bool InBounds(Vector2 position)
+    {
+        return position.X is >= 0 and < 8 && position.Y is >= 0 and < 8;
+    }
 
+    private bool CanCapture(ChessPiece piece, Vector2 position)
+    {
+        // Check if there is a piece to capture and, if there is, if it's the opposite color
+        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
+        if (pieceToTake == null || pieceToTake.Color == piece.Color)
+            return false;
+        
+        // If it's a pawn and moving straight, it can't capture
+        if (piece.Type == ChessPiece.PieceType.Pawn && (int) piece.Position.X == (int) position.X)
+            return false;
+        
         return true;
     }
-    
-    private bool InBounds(Vector2 position)
+
+    private bool IsBlocked(ChessPiece piece, Vector2 position)
     {
-        return position.X >= 0 && position.X < 8 && position.Y >= 0 && position.Y < 8;
+        if (_pieces.Any(p => p.Position == position))
+        {
+            // If there is a piece in the way and the pawn is moving straight, it's blocked (pawn can't capture)
+            if (piece.Type == ChessPiece.PieceType.Pawn && (int) piece.Position.X == (int) position.X)
+                return true;
+            // If there's a piece in the way that's the same color as the moving piece, it's blocked
+            if (_pieces.FirstOrDefault(p => p.Position == position)!.Color == piece.Color)
+                return true;
+        }
+        
+        // Knights can jump over pieces
+        if (piece.Type == ChessPiece.PieceType.Knight)
+            return false;
+        
+        // Bresenham's line algorithm
+        var points = new List<Vector2>();
+        var start = piece.Position;
+
+        // Calculate the difference between the x and y coordinates
+        var deltaX = (int) Math.Abs(position.X - start.X);
+        var deltaY = (int) Math.Abs(position.Y - start.Y);
+
+        // Calculate the sign of the increment for the x and y coordinates
+        var signX = start.X < position.X ? 1 : -1;
+        var signY = start.Y < position.Y ? 1 : -1;
+
+        // Calculate the error value
+        var err = deltaX - deltaY;
+
+        // Continue moving until the end point is reached
+        while ((int) start.X != (int) position.X || (int) start.Y != (int) position.Y)
+        {
+            var e2 = err * 2;
+
+            // Choose the direction with the smallest error value
+            if (e2 > -deltaX)
+            {
+                err -= deltaY;
+                start.X += signX;
+            }
+            if (e2 < deltaX)
+            {
+                err += deltaX;
+                start.Y += signY;
+            }
+
+            // Add the point to the list
+            points.Add(start);
+        }
+        // Remove the last point because, if it's a capture, it's not blocked
+        points.RemoveAt(points.Count - 1);
+
+        // If there's any point between the start and end, it's blocked
+        foreach (var point in points)
+        {
+            if (_pieces.Any(p => (int) p.Position.X == (int) point.X && (int) p.Position.Y == (int) point.Y))
+                return true;
+        }
+        
+        return false;
     }
     
-    private bool CanPlace(ChessPiece piece, Vector2 position)
+    private bool CanMove(ChessPiece piece, Vector2 position)
     {
+        // Check if it's outside the chessboard
         if (!InBounds(position))
             return false;
-        if (_pieces.Any(p => p.Position == position && p.Color == piece.Color))
-            return false;
+
+        // Check if the piece can move to the specified position
         if (!piece.CanMoveTo(position))
             return false;
+        
+        // Check if there is a piece in the space it is trying to move to
+        if (IsBlocked(piece, position))
+            return false;
+
+        var deltaX = (int) Math.Abs(position.X - piece.Position.X);
+        var deltaY = (int) Math.Abs(position.Y - piece.Position.Y);
         if (piece.Type == ChessPiece.PieceType.Pawn)
-            if (!(Math.Abs((int) position.X - (int) piece.Position.X) == 1 &&
-                Math.Abs((int) position.Y - (int) piece.Position.Y) == 1) && 
-                _pieces.Any(p => p.Position == position))
+        {
+            // If the pawn is moving diagonally but can't capture, it can't move
+            if (deltaX == 1 && deltaY == 1 && !CanCapture(piece, position))
                 return false;
+            if (_pieces.FirstOrDefault(p => p.Position == position) != null && deltaX == 0)
+                // If there is a piece in the destination square and it's moving straight, it can't move
+                return false;
+        }
+        
+        // If all checks pass, the move is valid
         return true;
     }
-    
+
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
