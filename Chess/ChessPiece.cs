@@ -78,6 +78,8 @@ public class ChessPiece
         {
             if (deltaX <= 1 && deltaY <= 1)
                 return true;
+            if (((int) position.X == 2 || (int) position.X == 6) && !HasMoved) // Castling
+                return true;
         }
         else if (Type == PieceType.Pawn)
         {
