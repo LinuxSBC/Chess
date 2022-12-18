@@ -58,12 +58,15 @@ public class ChessGame : Game
 
     private ChessPiece _pickedUpPiece;
     private MouseState _mouseState;
+
+    private ChessPiece.PieceColor _turn;
     
     public ChessGame()
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
+        _turn = ChessPiece.PieceColor.White; // White starts
     }
 
     protected override void Initialize()
@@ -221,21 +224,25 @@ public class ChessGame : Game
         return ToScreenSpace(new Vector2(x, y));
     }
     
-    private void Place(ChessPiece piece, Vector2 position)
+    private void Place(ChessPiece piece, Vector2 position, bool changeTurn)
     {
         if (!CanMove(piece, position)) return;
         
         if (CanCastle(piece, position)) Castle(piece, position);
 
         if (CanCapture(piece, position)) Capture(piece, position);
-
-        if (InCheckAfterMove(piece, position))
-            return;
+        
+        if (InCheckAfterMove(piece, position)) return;
+        
+        if (changeTurn && piece.Color != _turn) return;
 
         piece.Position = position;
 
         if (!piece.HasMoved)
             piece.HasMoved = true;
+
+        if (changeTurn)
+            _turn = _turn == ChessPiece.PieceColor.White ? ChessPiece.PieceColor.Black : ChessPiece.PieceColor.White;
 
         if (piece.Type == ChessPiece.PieceType.Pawn && (position.Y == 0 || (int) position.Y == 7))
         { // TODO: Add choice for promotion
@@ -244,6 +251,11 @@ public class ChessGame : Game
                 ? Content.Load<Texture2D>("BlackQueen")
                 : Content.Load<Texture2D>("WhiteQueen");
         }
+    }
+    
+    private void Place(ChessPiece piece, Vector2 position)
+    {
+        Place(piece, position, true);
     }
 
     private void Capture(ChessPiece piece, Vector2 position)
@@ -305,10 +317,10 @@ public class ChessGame : Game
         switch ((int) position.X)
         {
             case 2:
-                Place(rook, new Vector2(3, position.Y));
+                Place(rook, new Vector2(3, position.Y), false);
                 break;
             case 6:
-                Place(rook, new Vector2(5, position.Y));
+                Place(rook, new Vector2(5, position.Y), false);
                 break;
         }
     }
@@ -327,18 +339,12 @@ public class ChessGame : Game
             {
                 if (_pieces.Any(p =>
                         p.Position.X is > 0 and < 4 && (int) p.Position.Y == (int) king.Position.Y)) return false;
-                var rook = _pieces.FirstOrDefault(p =>
-                    p.Type == ChessPiece.PieceType.Rook && p.Position == new Vector2(0, king.Position.Y));
-                if (rook != null) Place(rook, new Vector2(3, king.Position.Y));
                 break;
             }
             case 6:
             {
                 if (_pieces.Any(p =>
                         p.Position.X is > 4 and < 7 && (int) p.Position.Y == (int) king.Position.Y)) return false;
-                var rook = _pieces.FirstOrDefault(p =>
-                    p.Type == ChessPiece.PieceType.Rook && p.Position == new Vector2(7, king.Position.Y));
-                if (rook != null) Place(rook, new Vector2(5, king.Position.Y));
                 break;
             }
             default:
@@ -443,18 +449,18 @@ public class ChessGame : Game
     {
         var deltaX = (int) Math.Abs(position.X - piece.Position.X);
         var deltaY = (int) Math.Abs(position.Y - piece.Position.Y);
+        //
+        // // Check if it's your turn
+        // if (piece.Color != _turn) return false;
         
         // Check if it's outside the chessboard
-        if (!InBounds(position))
-            return false;
+        if (!InBounds(position)) return false;
 
         // Check if the piece can move to the specified position
-        if (!piece.CanMoveTo(position))
-            return false;
+        if (!piece.CanMoveTo(position)) return false;
         
         // Check if there is a piece in the space it is trying to move to
-        if (IsBlocked(piece, position))
-            return false;
+        if (IsBlocked(piece, position)) return false;
         
         // Can't castle while in check
         if (piece.Type == ChessPiece.PieceType.King && deltaX == 2 && (InCheck(piece.Color) || InCheckAfterMove(piece, position))) return false;
