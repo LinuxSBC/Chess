@@ -449,9 +449,6 @@ public class ChessGame : Game
     {
         var deltaX = (int) Math.Abs(position.X - piece.Position.X);
         var deltaY = (int) Math.Abs(position.Y - piece.Position.Y);
-        //
-        // // Check if it's your turn
-        // if (piece.Color != _turn) return false;
         
         // Check if it's outside the chessboard
         if (!InBounds(position)) return false;
