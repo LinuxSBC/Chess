@@ -462,6 +462,34 @@ public class ChessGame : Game
         // Can't castle while in check
         if (piece.Type == ChessPiece.PieceType.King && deltaX == 2 && (InCheck(piece.Color) || InCheckAfterMove(piece, position))) return false;
 
+        // Check if it's trying to castle but has no rook
+        if (CanCastle(piece, position))
+            switch ((int) position.X)
+            {
+                case 2:
+                {
+                    if (_pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
+                                                    p.Color == piece.Color && 
+                                                    !p.HasMoved && 
+                                                    p.Position.X == 0 && 
+                                                    (int) p.Position.Y == (int) piece.Position.Y) == null)
+                        return false;
+                    break;
+                }
+                case 6:
+                {
+                    if (_pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
+                                                    p.Color == piece.Color && 
+                                                    !p.HasMoved && 
+                                                    (int) p.Position.X == 7 && 
+                                                    (int) p.Position.Y == (int) piece.Position.Y) == null)
+                        return false;
+                    break;
+                }
+                default:
+                    return false;
+            }
+
         if (piece.Type == ChessPiece.PieceType.Pawn)
         {
             // If the pawn is moving diagonally but can't capture, it can't move
