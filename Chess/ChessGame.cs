@@ -226,24 +226,29 @@ public class ChessGame : Game
     
     private void Place(ChessPiece piece, Vector2 position, bool changeTurn)
     {
+        if (CanCastle(piece, position)) Castle(piece, position);
+        
         if (!CanMove(piece, position)) return;
         
-        if (CanCastle(piece, position)) Castle(piece, position);
-
         if (CanCapture(piece, position)) Capture(piece, position);
         
         if (InCheckAfterMove(piece, position)) return;
         
         if (changeTurn && piece.Color != _turn) return;
+        
+        if (changeTurn)
+            _turn = _turn == ChessPiece.PieceColor.White ? ChessPiece.PieceColor.Black : ChessPiece.PieceColor.White;
 
+        SetPosition(piece, position);
+    }
+
+    private void SetPosition(ChessPiece piece, Vector2 position)
+    {
         piece.Position = position;
 
         if (!piece.HasMoved)
             piece.HasMoved = true;
-
-        if (changeTurn)
-            _turn = _turn == ChessPiece.PieceColor.White ? ChessPiece.PieceColor.Black : ChessPiece.PieceColor.White;
-
+        
         if (piece.Type == ChessPiece.PieceType.Pawn && (position.Y == 0 || (int) position.Y == 7))
         { // TODO: Add choice for promotion
             piece.Type = ChessPiece.PieceType.Queen;
@@ -273,6 +278,7 @@ public class ChessGame : Game
 
     private bool InCheckAfterMove(ChessPiece piece, Vector2 position)
     {
+        // Move to the given position
         ChessPiece pieceToTake = null;
         var captured = false;
         if (CanCapture(piece, position))
@@ -290,8 +296,10 @@ public class ChessGame : Game
         var oldPosition = piece.Position;
         piece.Position = position;
         
+        // See if it's in check
         var inCheck = InCheck(piece.Color);
         
+        // Move back to the old position
         piece.Position = oldPosition;
         
         if (captured)
@@ -307,20 +315,31 @@ public class ChessGame : Game
         return inCheck;
     }
 
-    private void Castle(ChessPiece piece, Vector2 position)
+    private void Castle(ChessPiece king, Vector2 position)
     {
-        if (!CanMove(piece, position) || !CanCastle(piece, position)) return;
-
-        var rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && p.Color == piece.Color && !p.HasMoved);
-        if (rook == null) return;
+        ChessPiece rook;
 
         switch ((int) position.X)
         {
             case 2:
+                rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
+                                                       p.Position.X == 0 && 
+                                                       (int) p.Position.Y == (int) king.Position.Y && 
+                                                       p.Color == king.Color && 
+                                                       !p.HasMoved);
+                if (rook == null) return;
                 Place(rook, new Vector2(3, position.Y), false);
+                SetPosition(king, new Vector2(6, position.Y));
                 break;
             case 6:
-                Place(rook, new Vector2(5, position.Y), false);
+                rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
+                                                       (int) p.Position.X == 7 && 
+                                                       (int) p.Position.Y == (int) king.Position.Y && 
+                                                       p.Color == king.Color && 
+                                                       !p.HasMoved);
+                if (rook == null) return;
+                Place(rook, new Vector2(5, position.Y));
+                SetPosition(king, new Vector2(6, position.Y));
                 break;
         }
     }
@@ -459,37 +478,6 @@ public class ChessGame : Game
         // Check if there is a piece in the space it is trying to move to
         if (IsBlocked(piece, position)) return false;
         
-        // Can't castle while in check
-        if (piece.Type == ChessPiece.PieceType.King && deltaX == 2 && (InCheck(piece.Color) || InCheckAfterMove(piece, position))) return false;
-
-        // Check if it's trying to castle but has no rook
-        if (CanCastle(piece, position))
-            switch ((int) position.X)
-            {
-                case 2:
-                {
-                    if (_pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
-                                                    p.Color == piece.Color && 
-                                                    !p.HasMoved && 
-                                                    p.Position.X == 0 && 
-                                                    (int) p.Position.Y == (int) piece.Position.Y) == null)
-                        return false;
-                    break;
-                }
-                case 6:
-                {
-                    if (_pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
-                                                    p.Color == piece.Color && 
-                                                    !p.HasMoved && 
-                                                    (int) p.Position.X == 7 && 
-                                                    (int) p.Position.Y == (int) piece.Position.Y) == null)
-                        return false;
-                    break;
-                }
-                default:
-                    return false;
-            }
-
         if (piece.Type == ChessPiece.PieceType.Pawn)
         {
             // If the pawn is moving diagonally but can't capture, it can't move
