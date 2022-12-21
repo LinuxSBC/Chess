@@ -227,7 +227,7 @@ public class ChessGame : Game
     private void Place(ChessPiece piece, Vector2 position, bool changeTurn)
     {
         if (CanCastle(piece, position)) Castle(piece, position);
-        
+        // TODO: add en passant, checkmate, and stalemate
         if (!CanMove(piece, position)) return;
         
         if (CanCapture(piece, position)) Capture(piece, position);
