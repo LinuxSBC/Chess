@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Schema;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -164,7 +163,7 @@ public class ChessGame : Game
             _whiteRook1, _whiteKnight1, _whiteBishop1, _whiteQueen, _whiteKing, _whiteBishop2, _whiteKnight2, _whiteRook2,
             _whitePawn1, _whitePawn2, _whitePawn3, _whitePawn4, _whitePawn5, _whitePawn6, _whitePawn7, _whitePawn8
         };
-        _pieces = Enumerable.Concat(_blackPieces, _whitePieces).ToList();
+        _pieces = _blackPieces.Concat(_whitePieces).ToList();
     }
 
     protected override void Update(GameTime gameTime)
@@ -229,16 +228,16 @@ public class ChessGame : Game
         return ToScreenSpace(new Vector2(x, y));
     }
     
-    private void Place(ChessPiece piece, Vector2 target, bool changeTurn)
+    private void Place(ChessPiece piece, Vector2 target, bool changeTurn = true)
     {
         if (!CanMove(piece, target)) return;
         
         if (CanCastle(piece, target)) Castle(piece, target);
-
+        
         if (CanCapture(piece, target)) Capture(piece, target);
         
         if (InCheckAfterMove(piece, target)) return;
-        
+
         if (changeTurn && piece.Color != _turn) return;
 
         piece.Position = target;
@@ -257,15 +256,10 @@ public class ChessGame : Game
                 : Content.Load<Texture2D>("WhiteQueen");
         }
     }
-    
-    private void Place(ChessPiece piece, Vector2 target)
-    {
-        Place(piece, target, true);
-    }
 
     private void Capture(ChessPiece piece, Vector2 target)
     {
-        if (!CanMove(piece, target) || !CanCapture(piece, target)) return;
+        if (!CanCapture(piece, target) || InCheckAfterMove(piece, target)) return;
         
         var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
         if (pieceToTake is {Color: ChessPiece.PieceColor.Black})
@@ -385,15 +379,16 @@ public class ChessGame : Game
         return _pieces.Any(p => IsMoveValid(p, king.Position) && CanCapture(p, king.Position));
     }
 
-    private bool CanCapture(ChessPiece piece, Vector2 target)
+    private bool CanCapture(ChessPiece piece, Vector2 target) 
     {
         var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
         bool notCapturing = pieceToTake == null;
         bool sameColor = pieceToTake?.Color == piece.Color;
         bool isPawn = piece.Type == ChessPiece.PieceType.Pawn;
         bool movingStraight = (int) piece.Position.X == (int) target.X;
-        
-        if (notCapturing || sameColor || 
+        bool canMove = IsMoveValid(piece, target);
+
+        if (notCapturing || sameColor || !canMove ||
             (isPawn && movingStraight))
             return false;
         
@@ -402,7 +397,6 @@ public class ChessGame : Game
 
     private bool IsBlocked(ChessPiece piece, Vector2 target)
     {
-        bool tryingToCapture = _pieces.Any(p => p.Position == target);
         var pointsBetween = PointsBetween(piece.Position, target);
         bool anyPieceBetween = false;
         bool isKnight = piece.Type == ChessPiece.PieceType.Knight;
@@ -413,8 +407,7 @@ public class ChessGame : Game
                 anyPieceBetween = true;
         }
         
-        if (tryingToCapture && !CanCapture(piece, target) || 
-            (anyPieceBetween && !isKnight))
+        if (anyPieceBetween && !isKnight)
             return true;
         
         return false;
@@ -428,6 +421,9 @@ public class ChessGame : Game
         // Calculate the difference between the x and y coordinates
         var deltaX = (int) Math.Abs(target.X - start.X);
         var deltaY = (int) Math.Abs(target.Y - start.Y);
+        
+        if (deltaX == 0 && deltaY == 0)
+            return points;
 
         // Calculate the sign of the increment for the x and y coordinates
         var signX = start.X < target.X ? 1 : -1;
@@ -491,11 +487,14 @@ public class ChessGame : Game
         
         if (piece.Type == ChessPiece.PieceType.Pawn)
         {
-            // If the pawn is moving diagonally but can't capture, it can't move
-            if (deltaX == 1 && deltaY == 1 && !CanCapture(piece, target))
-                return false;
-            if (_pieces.FirstOrDefault(p => p.Position == target) != null && deltaX == 0)
-                // If there is a piece in the destination square and it's moving straight, it can't move
+            var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+            bool capturing = pieceToTake != null;
+            bool sameColor = pieceToTake?.Color == piece.Color;
+            bool movingStraight = deltaX == 0;
+            bool movingDiagonally = deltaX == 1 && deltaY == 1;
+            
+            if ((movingDiagonally && (!capturing || sameColor)) || 
+                (movingStraight && capturing))
                 return false;
         }
         
