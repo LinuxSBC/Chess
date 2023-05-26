@@ -10,6 +10,11 @@ namespace Chess;
 
 public class ChessGame : Game
 {
+    private const int LeftSide = 0;
+    private const int RightSide = 7;
+    private const int TopSide = 0;
+    private const int BottomSide = 7;
+
     private static Texture2D _chessBoard;
 
     private ChessPiece _blackRook1;
@@ -224,32 +229,27 @@ public class ChessGame : Game
         return ToScreenSpace(new Vector2(x, y));
     }
     
-    private void Place(ChessPiece piece, Vector2 position, bool changeTurn)
+    private void Place(ChessPiece piece, Vector2 target, bool changeTurn)
     {
-        if (CanCastle(piece, position)) Castle(piece, position);
-        // TODO: add en passant, checkmate, and stalemate
-        if (!CanMove(piece, position)) return;
+        if (!CanMove(piece, target)) return;
         
-        if (CanCapture(piece, position)) Capture(piece, position);
+        if (CanCastle(piece, target)) Castle(piece, target);
+
+        if (CanCapture(piece, target)) Capture(piece, target);
         
-        if (InCheckAfterMove(piece, position)) return;
+        if (InCheckAfterMove(piece, target)) return;
         
         if (changeTurn && piece.Color != _turn) return;
-        
-        if (changeTurn)
-            _turn = _turn == ChessPiece.PieceColor.White ? ChessPiece.PieceColor.Black : ChessPiece.PieceColor.White;
 
-        SetPosition(piece, position);
-    }
-
-    private void SetPosition(ChessPiece piece, Vector2 position)
-    {
-        piece.Position = position;
+        piece.Position = target;
 
         if (!piece.HasMoved)
             piece.HasMoved = true;
-        
-        if (piece.Type == ChessPiece.PieceType.Pawn && (position.Y == 0 || (int) position.Y == 7))
+
+        if (changeTurn)
+            _turn = _turn == ChessPiece.PieceColor.White ? ChessPiece.PieceColor.Black : ChessPiece.PieceColor.White;
+
+        if (piece.Type == ChessPiece.PieceType.Pawn && (target.Y == 0 || (int) target.Y == 7))
         { // TODO: Add choice for promotion
             piece.Type = ChessPiece.PieceType.Queen;
             piece.Texture = piece.Color == ChessPiece.PieceColor.Black
@@ -258,16 +258,16 @@ public class ChessGame : Game
         }
     }
     
-    private void Place(ChessPiece piece, Vector2 position)
+    private void Place(ChessPiece piece, Vector2 target)
     {
-        Place(piece, position, true);
+        Place(piece, target, true);
     }
 
-    private void Capture(ChessPiece piece, Vector2 position)
+    private void Capture(ChessPiece piece, Vector2 target)
     {
-        if (!CanMove(piece, position) || !CanCapture(piece, position)) return;
+        if (!CanMove(piece, target) || !CanCapture(piece, target)) return;
         
-        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
+        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
         if (pieceToTake is {Color: ChessPiece.PieceColor.Black})
             _blackPieces.Remove(pieceToTake);
         else
@@ -276,14 +276,13 @@ public class ChessGame : Game
         _pieces.Remove(pieceToTake);
     }
 
-    private bool InCheckAfterMove(ChessPiece piece, Vector2 position)
+    private bool InCheckAfterMove(ChessPiece piece, Vector2 target)
     {
-        // Move to the given position
         ChessPiece pieceToTake = null;
         var captured = false;
-        if (CanCapture(piece, position))
+        if (CanCapture(piece, target))
         {
-            pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
+            pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
             captured = true;
             if (pieceToTake is {Color: ChessPiece.PieceColor.Black})
                 _blackPieces.Remove(pieceToTake);
@@ -294,12 +293,10 @@ public class ChessGame : Game
         }
         
         var oldPosition = piece.Position;
-        piece.Position = position;
+        piece.Position = target;
         
-        // See if it's in check
         var inCheck = InCheck(piece.Color);
         
-        // Move back to the old position
         piece.Position = oldPosition;
         
         if (captured)
@@ -315,124 +312,132 @@ public class ChessGame : Game
         return inCheck;
     }
 
-    private void Castle(ChessPiece king, Vector2 position)
+    private void Castle(ChessPiece piece, Vector2 target)
     {
-        ChessPiece rook;
+        if (!CanMove(piece, target) || !CanCastle(piece, target)) return;
 
-        switch ((int) position.X)
+        var rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && p.Color == piece.Color && !p.HasMoved);
+        if (rook == null) return;
+
+        switch ((int) target.X)
         {
             case 2:
-                rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
-                                                       p.Position.X == 0 && 
-                                                       (int) p.Position.Y == (int) king.Position.Y && 
-                                                       p.Color == king.Color && 
-                                                       !p.HasMoved);
-                if (rook == null) return;
-                Place(rook, new Vector2(3, position.Y), false);
-                SetPosition(king, new Vector2(6, position.Y));
+                Place(rook, new Vector2(3, target.Y), false);
                 break;
             case 6:
-                rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && 
-                                                       (int) p.Position.X == 7 && 
-                                                       (int) p.Position.Y == (int) king.Position.Y && 
-                                                       p.Color == king.Color && 
-                                                       !p.HasMoved);
-                if (rook == null) return;
-                Place(rook, new Vector2(5, position.Y));
-                SetPosition(king, new Vector2(6, position.Y));
+                Place(rook, new Vector2(5, target.Y), false);
                 break;
         }
     }
 
-    private bool CanCastle(ChessPiece king, Vector2 position)
+    private bool CanCastle(ChessPiece king, Vector2 target)
     {
-        if (king.Type != ChessPiece.PieceType.King) return false;
+        const int kingX = 4;
+        const int castlingDistance = 2;
+        bool notAKing = king.Type != ChessPiece.PieceType.King;
+        bool notCastling = Math.Abs((int) king.Position.X - (int) target.X) != castlingDistance;
+        bool hasMoved = king.HasMoved;
+        bool queenSideCastle = (int) target.X == kingX - castlingDistance;
+        bool kingSideCastle = (int) target.X == kingX + castlingDistance;
         
-        if (Math.Abs((int) king.Position.X - (int) position.X) != 2) return false;
-        
-        if (InCheck(king.Color) || InCheckAfterMove(king, position)) return false;
-        
-        switch ((int) position.X)
+        bool validRook = false;
+        bool piecesBetween = false;
+        foreach (ChessPiece piece in _pieces) // A LINQ would make this slightly faster, but this is far more readable
         {
-            case 2:
-            {
-                if (_pieces.Any(p =>
-                        p.Position.X is > 0 and < 4 && (int) p.Position.Y == (int) king.Position.Y)) return false;
-                break;
-            }
-            case 6:
-            {
-                if (_pieces.Any(p =>
-                        p.Position.X is > 4 and < 7 && (int) p.Position.Y == (int) king.Position.Y)) return false;
-                break;
-            }
-            default:
-                return false;
+            bool isRook = piece.Type == ChessPiece.PieceType.Rook;
+            bool sameColor = piece.Color == king.Color;
+            bool notMoved = !piece.HasMoved;
+            bool onSameRow = (int) piece.Position.Y == (int) king.Position.Y;
+            bool onQueenSide = (int) piece.Position.X == LeftSide;
+            bool onKingSide = (int) piece.Position.X == RightSide;
+            bool correctSide = (queenSideCastle && onQueenSide) || (kingSideCastle && !onKingSide);
+            bool onLeft = piece.Position.X is > LeftSide and < kingX;
+            bool onRight = piece.Position.X is > kingX and < RightSide;
+            bool betweenPieces = (queenSideCastle && onLeft) || (kingSideCastle && onRight);
+            
+            if (isRook && sameColor && notMoved && onSameRow && correctSide)
+                validRook = true;
+
+            if (betweenPieces && onSameRow)
+                piecesBetween = true;
         }
+        
+        if (notAKing || notCastling || hasMoved ||
+            InCheck(king.Color) || InCheckAfterMove(king, target) ||
+            !validRook || piecesBetween)
+            return false;
 
         return true;
     }
     
     private static bool InBounds(Vector2 position)
     {
-        return position.X is >= 0 and < 8 && position.Y is >= 0 and < 8;
+        bool inRank = position.Y is >= LeftSide and <= RightSide;
+        bool inFile = position.X is >= TopSide and <= BottomSide;
+        return inRank && inFile;
     }
     
     private bool InCheck(ChessPiece.PieceColor color)
     {
         var king = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.King && p.Color == color);
-        if (king == null) return false;
+        if (king == null) return false; // shouldn't happen because there is always a king unless the game is over
         
-        return _pieces.Any(p => CanMove(p, king.Position) && CanCapture(p, king.Position));
+        return _pieces.Any(p => IsMoveValid(p, king.Position) && CanCapture(p, king.Position));
     }
 
-    private bool CanCapture(ChessPiece piece, Vector2 position)
+    private bool CanCapture(ChessPiece piece, Vector2 target)
     {
-        // Check if there is a piece to capture and, if there is, if it's the opposite color
-        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == position);
-        if (pieceToTake == null || pieceToTake.Color == piece.Color)
-            return false;
+        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+        bool notCapturing = pieceToTake == null;
+        bool sameColor = pieceToTake?.Color == piece.Color;
+        bool isPawn = piece.Type == ChessPiece.PieceType.Pawn;
+        bool movingStraight = (int) piece.Position.X == (int) target.X;
         
-        // If it's a pawn and moving straight, it can't capture
-        if (piece.Type == ChessPiece.PieceType.Pawn && (int) piece.Position.X == (int) position.X)
+        if (notCapturing || sameColor || 
+            (isPawn && movingStraight))
             return false;
         
         return true;
     }
 
-    private bool IsBlocked(ChessPiece piece, Vector2 position)
+    private bool IsBlocked(ChessPiece piece, Vector2 target)
     {
-        if (_pieces.Any(p => p.Position == position))
+        bool tryingToCapture = _pieces.Any(p => p.Position == target);
+        var pointsBetween = PointsBetween(piece.Position, target);
+        bool anyPieceBetween = false;
+        bool isKnight = piece.Type == ChessPiece.PieceType.Knight;
+        foreach (var betweenPiece in _pieces)
         {
-            // If there is a piece in the way and the pawn is moving straight, it's blocked (pawn can't capture)
-            if (piece.Type == ChessPiece.PieceType.Pawn && (int) piece.Position.X == (int) position.X)
-                return true;
-            // If there's a piece in the way that's the same color as the moving piece, it's blocked
-            if (_pieces.FirstOrDefault(p => p.Position == position)!.Color == piece.Color)
-                return true;
+            bool pieceIsBetween = pointsBetween.Any(point => point == betweenPiece.Position);
+            if (pieceIsBetween)
+                anyPieceBetween = true;
         }
         
-        // Knights can jump over pieces
-        if (piece.Type == ChessPiece.PieceType.Knight)
-            return false;
+        if (tryingToCapture && !CanCapture(piece, target) || 
+            (anyPieceBetween && !isKnight))
+            return true;
         
+        return false;
+    }
+
+    private static List<Vector2> PointsBetween(Vector2 start, Vector2 target)
+    {
         // Bresenham's line algorithm
         var points = new List<Vector2>();
-        var start = piece.Position;
 
         // Calculate the difference between the x and y coordinates
-        var deltaX = (int) Math.Abs(position.X - start.X);
-        var deltaY = (int) Math.Abs(position.Y - start.Y);
+        var deltaX = (int) Math.Abs(target.X - start.X);
+        var deltaY = (int) Math.Abs(target.Y - start.Y);
 
         // Calculate the sign of the increment for the x and y coordinates
-        var signX = start.X < position.X ? 1 : -1;
-        var signY = start.Y < position.Y ? 1 : -1;
+        var signX = start.X < target.X ? 1 : -1;
+        var signY = start.Y < target.Y ? 1 : -1;
 
         // Calculate the error value
         var err = deltaX - deltaY;
 
         // Continue moving until the end point is reached
-        while ((int) start.X != (int) position.X || (int) start.Y != (int) position.Y)
+        while ((int) start.X != (int) target.X || (int) start.Y != (int) target.Y)
         {
             var e2 = err * 2;
 
@@ -442,54 +447,61 @@ public class ChessGame : Game
                 err -= deltaY;
                 start.X += signX;
             }
+
             if (e2 < deltaX)
             {
                 err += deltaX;
                 start.Y += signY;
             }
 
-            // Add the point to the list
             points.Add(start);
         }
-        // Remove the last point because, if it's a capture, it's not blocked
+
+        // Just the points between the start and end, not including the start and end
         points.RemoveAt(points.Count - 1);
-
-        // If there's any point between the start and end, it's blocked
-        foreach (var point in points)
-        {
-            if (_pieces.Any(p => (int) p.Position.X == (int) point.X && (int) p.Position.Y == (int) point.Y))
-                return true;
-        }
-        
-        return false;
+        return points;
     }
-    
-    private bool CanMove(ChessPiece piece, Vector2 position)
-    {
-        var deltaX = (int) Math.Abs(position.X - piece.Position.X);
-        var deltaY = (int) Math.Abs(position.Y - piece.Position.Y);
-        
-        // Check if it's outside the chessboard
-        if (!InBounds(position)) return false;
 
-        // Check if the piece can move to the specified position
-        if (!piece.CanMoveTo(position)) return false;
-        
-        // Check if there is a piece in the space it is trying to move to
-        if (IsBlocked(piece, position)) return false;
+    private bool CanMove(ChessPiece piece, Vector2 target)
+    {
+        int deltaX = (int) Math.Abs(target.X - piece.Position.X);
+        bool inCheck = InCheck(piece.Color);
+        bool inCheckAfterMove = InCheckAfterMove(piece, target);
+        bool castling = piece.Type == ChessPiece.PieceType.King && deltaX == 2;
+        bool invalidMove = !IsMoveValid(piece, target);
+
+        if (invalidMove || 
+            (castling && (inCheck || inCheckAfterMove)))
+            return false;
+        return true;
+    }
+
+    private bool IsMoveValid(ChessPiece piece, Vector2 target) // CanMove without the check for check to prevent infinite loop
+    {
+        int deltaX = (int) Math.Abs(target.X - piece.Position.X);
+        int deltaY = (int) Math.Abs(target.Y - piece.Position.Y);
+        bool outOfChessboard = !InBounds(target);
+        bool pieceIllegalMove = !piece.CanMoveTo(target);
+        bool isBlocked = IsBlocked(piece, target);
+        bool castling = piece.Type == ChessPiece.PieceType.King && deltaX == 2;
+
+        if (outOfChessboard || pieceIllegalMove || isBlocked || 
+            (castling && !CanCastle(piece, target)))
+            return false;
         
         if (piece.Type == ChessPiece.PieceType.Pawn)
         {
             // If the pawn is moving diagonally but can't capture, it can't move
-            if (deltaX == 1 && deltaY == 1 && !CanCapture(piece, position))
+            if (deltaX == 1 && deltaY == 1 && !CanCapture(piece, target))
                 return false;
-            if (_pieces.FirstOrDefault(p => p.Position == position) != null && deltaX == 0)
+            if (_pieces.FirstOrDefault(p => p.Position == target) != null && deltaX == 0)
                 // If there is a piece in the destination square and it's moving straight, it can't move
                 return false;
         }
         
         // If all checks pass, the move is valid
         return true;
+
     }
 
     protected override void Draw(GameTime gameTime)
