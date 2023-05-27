@@ -56,7 +56,6 @@ public class ChessGame : Game
 
     private int _maxSize;
 
-    // ReSharper disable once NotAccessedField.Local
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
@@ -168,34 +167,42 @@ public class ChessGame : Game
 
     protected override void Update(GameTime gameTime)
     {
-        if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
-            Keyboard.GetState().IsKeyDown(Keys.Escape))
-            Exit();
-
+        bool backButtonPressed = GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed;
+        bool escapeKeyPressed = Keyboard.GetState().IsKeyDown(Keys.Escape);
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
         var mouseSquare = ToChessGrid(_mouseState.X, _mouseState.Y);
+        bool holdingPiece = _pickedUpPiece != null;
+        bool mouseInBoardX = _mouseState.X > 0 && _mouseState.X < _maxSize;
+        bool mouseInBoardY = _mouseState.Y > 0 && _mouseState.Y < _maxSize;
+        bool mouseInBoard = mouseInBoardX && mouseInBoardY;
+        bool isPieceUnderMouse = _pieces.Any(p => p.Position == mouseSquare);
 
-        if (mouseClicked && _pickedUpPiece == null && 
-            _mouseState.X > 0 && _mouseState.X < _maxSize && 
-            _mouseState.Y > 0 && _mouseState.Y < _maxSize &&
-            _pieces.Any(p => p.Position == mouseSquare))
-        {
-            // Pick up the piece
-            _pickedUpPiece = _pieces.FirstOrDefault(p => p.Position == mouseSquare);
-            if (_pickedUpPiece != null) _pickedUpPiece.BeingDragged = true;
-        }
-        else if (!mouseClicked && _pickedUpPiece != null)
-        { // Drop the piece
-            Place(_pickedUpPiece, mouseSquare);
-
-            _pickedUpPiece.BeingDragged = false;
-            _pickedUpPiece = null;
-        }
+        if (backButtonPressed || escapeKeyPressed)
+            Exit();
         
+        if (mouseClicked && !holdingPiece && mouseInBoard && isPieceUnderMouse)
+            PickUpPiece(mouseSquare);
+        else if (!mouseClicked && holdingPiece)
+            PlacePiece(mouseSquare);
+
         base.Update(gameTime);
     }
-    
+
+    private void PlacePiece(Vector2 mouseSquare)
+    {
+        Place(_pickedUpPiece, mouseSquare);
+
+        _pickedUpPiece.BeingDragged = false;
+        _pickedUpPiece = null;
+    }
+
+    private void PickUpPiece(Vector2 mouseSquare)
+    {
+        _pickedUpPiece = _pieces.FirstOrDefault(p => p.Position == mouseSquare);
+        if (_pickedUpPiece != null) _pickedUpPiece.BeingDragged = true;
+    }
+
     private Vector2 ToChessGrid(Vector2 position)
     {
         var scale = _maxSize / 8f;
@@ -230,16 +237,14 @@ public class ChessGame : Game
     
     private void Place(ChessPiece piece, Vector2 target, bool changeTurn = true)
     {
-        if (!CanMove(piece, target)) return;
+        bool wrongTurn = changeTurn && piece.Color != _turn;
+        
+        if (!CanMove(piece, target) || wrongTurn) return;
         
         if (CanCastle(piece, target)) Castle(piece, target);
         
         if (CanCapture(piece, target)) Capture(piece, target);
         
-        if (InCheckAfterMove(piece, target)) return;
-
-        if (changeTurn && piece.Color != _turn) return;
-
         piece.Position = target;
 
         if (!piece.HasMoved)
@@ -255,6 +260,8 @@ public class ChessGame : Game
                 ? Content.Load<Texture2D>("BlackQueen")
                 : Content.Load<Texture2D>("WhiteQueen");
         }
+        
+        // TODO: Add checkmate dialog
     }
 
     private void Capture(ChessPiece piece, Vector2 target)
@@ -306,22 +313,26 @@ public class ChessGame : Game
         return inCheck;
     }
 
-    private void Castle(ChessPiece piece, Vector2 target)
+    private void Castle(ChessPiece king, Vector2 target)
     {
-        if (!CanMove(piece, target) || !CanCastle(piece, target)) return;
+        const int kingX = 4;
+        const int kingCastlingDistance = 2;
+        bool queenSideCastle = (int) target.X == kingX - kingCastlingDistance;
+        int currentRookX = queenSideCastle ? LeftSide : RightSide;
+        Vector2 currentRookPosition = new Vector2(currentRookX, king.Position.Y);
 
-        var rook = _pieces.FirstOrDefault(p => p.Type == ChessPiece.PieceType.Rook && p.Color == piece.Color && !p.HasMoved);
+        var rook = _pieces.FirstOrDefault(p => 
+            p.Position == currentRookPosition && 
+            p.Type == ChessPiece.PieceType.Rook && 
+            p.Color == king.Color && 
+            !p.HasMoved);
         if (rook == null) return;
-
-        switch ((int) target.X)
-        {
-            case 2:
-                Place(rook, new Vector2(3, target.Y), false);
-                break;
-            case 6:
-                Place(rook, new Vector2(5, target.Y), false);
-                break;
-        }
+        
+        // When castling, the rook moves to between the new king position and the old king position
+        float rookTargetX = (target.X + king.Position.X) / 2;
+        Vector2 rookTarget = new Vector2(rookTargetX, rook.Position.Y);
+        
+        Place(rook, rookTarget, false);
     }
 
     private bool CanCastle(ChessPiece king, Vector2 target)
@@ -336,7 +347,7 @@ public class ChessGame : Game
         
         bool validRook = false;
         bool piecesBetween = false;
-        foreach (ChessPiece piece in _pieces) // A LINQ would make this slightly faster, but this is far more readable
+        foreach (ChessPiece piece in _pieces)
         {
             bool isRook = piece.Type == ChessPiece.PieceType.Rook;
             bool sameColor = piece.Color == king.Color;
@@ -344,7 +355,7 @@ public class ChessGame : Game
             bool onSameRow = (int) piece.Position.Y == (int) king.Position.Y;
             bool onQueenSide = (int) piece.Position.X == LeftSide;
             bool onKingSide = (int) piece.Position.X == RightSide;
-            bool correctSide = (queenSideCastle && onQueenSide) || (kingSideCastle && !onKingSide);
+            bool correctSide = (queenSideCastle && onQueenSide) || (kingSideCastle && onKingSide);
             bool onLeft = piece.Position.X is > LeftSide and < kingX;
             bool onRight = piece.Position.X is > kingX and < RightSide;
             bool betweenPieces = (queenSideCastle && onLeft) || (kingSideCastle && onRight);
@@ -357,7 +368,6 @@ public class ChessGame : Game
         }
         
         if (notAKing || notCastling || hasMoved ||
-            InCheck(king.Color) || InCheckAfterMove(king, target) ||
             !validRook || piecesBetween)
             return false;
 
@@ -461,13 +471,16 @@ public class ChessGame : Game
     private bool CanMove(ChessPiece piece, Vector2 target)
     {
         int deltaX = (int) Math.Abs(target.X - piece.Position.X);
-        bool inCheck = InCheck(piece.Color);
-        bool inCheckAfterMove = InCheckAfterMove(piece, target);
         bool castling = piece.Type == ChessPiece.PieceType.King && deltaX == 2;
+        bool canCastle = CanCastle(piece, target);
         bool invalidMove = !IsMoveValid(piece, target);
+        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+        bool capturing = pieceToTake != null;
+        bool inCheckAfterMove = InCheckAfterMove(piece, target);
 
-        if (invalidMove || 
-            (castling && (inCheck || inCheckAfterMove)))
+        if (invalidMove || inCheckAfterMove ||
+            (capturing && !CanCapture(piece, target)) ||
+            (castling && !canCastle))
             return false;
         return true;
     }
@@ -481,7 +494,7 @@ public class ChessGame : Game
         bool isBlocked = IsBlocked(piece, target);
         bool castling = piece.Type == ChessPiece.PieceType.King && deltaX == 2;
 
-        if (outOfChessboard || pieceIllegalMove || isBlocked || 
+        if (outOfChessboard || pieceIllegalMove || isBlocked ||
             (castling && !CanCastle(piece, target)))
             return false;
         
