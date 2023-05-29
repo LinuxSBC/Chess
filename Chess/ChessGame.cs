@@ -16,7 +16,7 @@ public class ChessGame : Game
     private const int TopSide = 0;
     private const int BottomSide = 7;
 
-    private static Texture2D _chessBoard;
+    private Texture2D _chessBoard;
 
     private List<ChessPiece> _blackPieces;
     private List<ChessPiece> _whitePieces;
@@ -24,7 +24,7 @@ public class ChessGame : Game
 
     private int _maxSize;
 
-    private GraphicsDeviceManager _graphics;
+    public GraphicsDeviceManager Graphics { get; }
     private SpriteBatch _spriteBatch;
 
     private ChessPiece _pickedUpPiece;
@@ -37,7 +37,7 @@ public class ChessGame : Game
     
     public ChessGame()
     {
-        _graphics = new GraphicsDeviceManager(this);
+        Graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
         _turn = PieceColor.White; // White starts
@@ -56,7 +56,7 @@ public class ChessGame : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         
         _chessBoard = Content.Load<Texture2D>("ChessBoard");
-
+        
         _blackPieces = new List<ChessPiece>
         {
             new Rook(PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
@@ -76,7 +76,7 @@ public class ChessGame : Game
             new Rook(PieceColor.Black, Content.Load<Texture2D>("BlackRook"), 
                 new Position(7, 0))
         };
-
+        
         _whitePieces = new List<ChessPiece>
         {
             new Rook(PieceColor.White, Content.Load<Texture2D>("WhiteRook"),
@@ -97,11 +97,13 @@ public class ChessGame : Game
                 new Position(7, 7))
         };
         
+        var blackPawnTexture = Content.Load<Texture2D>("BlackPawn");
+        var whitePawnTexture = Content.Load<Texture2D>("WhitePawn");
         for (int i = 0; i < 8; i++)
         {
-            _blackPieces.Add(new Pawn(PieceColor.Black, Content.Load<Texture2D>("BlackPawn"),
+            _blackPieces.Add(new Pawn(PieceColor.Black, blackPawnTexture,
                 new Position(i, 1)));
-            _whitePieces.Add(new Pawn(PieceColor.White, Content.Load<Texture2D>("WhitePawn"),
+            _whitePieces.Add(new Pawn(PieceColor.White, whitePawnTexture,
                 new Position(i, 6)));
         }
 
@@ -118,7 +120,7 @@ public class ChessGame : Game
         bool mouseInBoardX = _mouseState.X > 0 && _mouseState.X < _maxSize;
         bool mouseInBoardY = _mouseState.Y > 0 && _mouseState.Y < _maxSize;
         bool mouseInBoard = mouseInBoardX && mouseInBoardY;
-        Position targetSquare = ToChessGrid(_mouseState.X, _mouseState.Y);
+        Position targetSquare = ToChessGrid(new Vector2(_mouseState.X, _mouseState.Y));
         bool isPieceUnderMouse = _pieces.Any(p => Equals(p.Position, targetSquare));
 
         if (backButtonPressed || escapeKeyPressed)
@@ -151,31 +153,16 @@ public class ChessGame : Game
         var scale = _maxSize / 8f;
         return new Position((int) (position.X / scale), (int) (position.Y / scale));
     }
-        
+    
     private Vector2 ToScreenSpace(Vector2 position)
     {
         var scale = _maxSize / 8f;
         return new Vector2(position.X * scale, position.Y * scale);
     }
-    
-    private int ToChessX(float position)
-    {
-        return ToChessGrid(new Vector2(position, 0)).X;
-    }
-    
-    private Position ToChessGrid(float x, float y)
-    {
-        return ToChessGrid(new Vector2(x, y));
-    }
 
     private float ToScreenX(float position)
     {
         return ToScreenSpace(new Vector2(position, 0)).X;
-    }
-    
-    private Vector2 ToScreenSpace(float x, float y)
-    {
-        return ToScreenSpace(new Vector2(x, y));
     }
     
     private void Place(ChessPiece piece, Position target, bool changeTurn = true)
@@ -235,31 +222,35 @@ public class ChessGame : Game
         foreach (var piece in pieces)
         {
             var possibleMoves = piece.GetPossibleMoves();
-            foreach (var move in possibleMoves)
-                if (CanMove(piece, move, ignoreTurn: true))
-                    return false;
+            if (possibleMoves.Any(move => 
+                    CanMove(piece, move, ignoreTurn: true)))
+                return false;
         }
 
         return true;
     }
 
-    private static bool ShouldPromotePawn(ChessPiece piece)
+    private static bool ShouldPromotePawn(ChessPiece pawn)
     {
-        bool isPawn = piece is Pawn;
-        bool onBottomRank = piece.Position.Y == BottomSide;
-        bool onTopRank = piece.Position.Y == TopSide;
+        bool isPawn = pawn is Pawn;
+        bool onBottomRank = pawn.Position.Y == BottomSide;
+        bool onTopRank = pawn.Position.Y == TopSide;
         bool onLastRank = onBottomRank || onTopRank;
         return isPawn && onLastRank;
     }
 
-    private ChessPiece PromotePawn(ChessPiece piece)
+    private void PromotePawn(ChessPiece pawn)
     {
         // TODO: Add choice for promotion
-        Texture2D texture = piece.Color == PieceColor.Black
+        var texture = pawn.Color == PieceColor.Black
             ? Content.Load<Texture2D>("BlackQueen")
             : Content.Load<Texture2D>("WhiteQueen");
-        Queen queen = new Queen(piece.Color, texture, piece.Position);
-        return queen;
+        var position = pawn.Position;
+        var color = pawn.Color;
+        
+        RemovePiece(pawn.Position);
+        Queen queen = new Queen(color, texture, position);
+        AddPiece(queen);
     }
 
     private void ChangeTurn()
@@ -360,43 +351,35 @@ public class ChessGame : Game
 
     private bool CanCastle(ChessPiece king, Position target)
     {
-        const int kingX = 4;
         const int castlingDistance = 2;
         bool notAKing = king is not King;
         bool notCastling = Math.Abs(king.Position.X - target.X) != castlingDistance;
         bool hasMoved = king.HasMoved;
-        bool queenSideCastle = target.X == kingX - castlingDistance;
-        bool kingSideCastle = target.X == kingX + castlingDistance;
-        
-        bool validRook = false;
-        bool piecesBetween = false;
-        foreach (ChessPiece piece in _pieces)
-        {
-            bool isRook = piece is Rook;
-            bool sameColor = piece.Color == king.Color;
-            bool notMoved = !piece.HasMoved;
-            bool onSameRow = piece.Position.Y == king.Position.Y;
-            bool onQueenSide = piece.Position.X == LeftSide;
-            bool onKingSide = piece.Position.X == RightSide;
-            bool correctSide = (queenSideCastle && onQueenSide) || (kingSideCastle && onKingSide);
-            bool onLeft = piece.Position.X is > LeftSide and < kingX;
-            bool onRight = piece.Position.X is > kingX and < RightSide;
-            bool betweenPieces = (queenSideCastle && onLeft) || (kingSideCastle && onRight);
-            
-            if (isRook && sameColor && notMoved && onSameRow && correctSide)
-                validRook = true;
 
-            if (betweenPieces && onSameRow)
-                piecesBetween = true;
-        }
-        
+        var validRook = CastleValidRook(king, target);
+
         if (notAKing || notCastling || hasMoved ||
-            !validRook || piecesBetween)
+            IsBlocked(king, target) || !validRook)
             return false;
 
         return true;
     }
-    
+
+    private bool CastleValidRook(ChessPiece king, Position target)
+    {
+        const int castlingDistance = 2;
+        bool queenSideCastle = target.X == king.Position.X - castlingDistance;
+        int rookPositionX = queenSideCastle ? LeftSide : RightSide;
+        Position rookPosition = new Position(rookPositionX, king.Position.Y);
+        
+        var rook = _pieces.FirstOrDefault(piece => 
+            piece is Rook && 
+            piece.Color == king.Color && 
+            Equals(piece.Position, rookPosition));
+        
+        return rook != null;
+    }
+
     private static bool InBounds(Position position)
     {
         bool inRank = position.Y is >= LeftSide and <= RightSide;
@@ -513,6 +496,50 @@ public class ChessGame : Game
         return true;
     }
 
+    private bool IsMoveValid(ChessPiece piece, Position target, bool ignoreTurn = false) // CanMove without the check for check to prevent infinite loop
+    {
+        int deltaX = Math.Abs(target.X - piece.Position.X);
+        int deltaY = Math.Abs(target.Y - piece.Position.Y);
+        bool outOfChessboard = !InBounds(target);
+        bool pieceIllegalMove = !piece.CanMoveTo(target);
+        bool isBlocked = IsBlocked(piece, target);
+        bool castling = piece is King && deltaX == 2;
+        bool wrongTurn = !ignoreTurn && piece.Color != _turn;
+        bool notMoving = deltaX == 0 && deltaY == 0;
+
+        if (CanEnPassant(piece, target)) // En passant is a special case
+            return true;
+
+        if (notMoving || outOfChessboard || pieceIllegalMove || isBlocked || wrongTurn ||
+            (castling && !CanCastle(piece, target)) || 
+            (PawnMovingDiagonal(piece, target) && !PawnCanCapture(piece, target)))
+            return false;
+
+        // If all checks pass, the move is valid
+        return true;
+    }
+
+    private bool PawnMovingDiagonal(ChessPiece pawn, Position target)
+    {
+        if (pawn is not Pawn) return false;
+        int deltaX = Math.Abs(target.X - pawn.Position.X);
+        int deltaY = Math.Abs(target.Y - pawn.Position.Y);
+        bool movingDiagonally = deltaX == 1 && deltaY == 1;
+        return movingDiagonally;
+    }
+    
+    private bool PawnCanCapture(ChessPiece pawn, Position target)
+    {
+        if (pawn is not Pawn) return false;
+        var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
+        if (CanEnPassant(pawn, target)) pieceToTake = _lastMovedPiece;
+        bool capturing = pieceToTake != null;
+        bool sameColor = pieceToTake?.Color == pawn.Color;
+        bool movingStraight = pawn.Position.X == target.X;
+
+        return capturing && !sameColor && !movingStraight;
+    }
+    
     private bool CanEnPassant(ChessPiece piece, Position target)
     {
         int deltaX = Math.Abs(target.X - piece.Position.X);
@@ -530,43 +557,7 @@ public class ChessGame : Game
         bool enPassantEligible = _lastMoveEnPassantEligible && lastMoveAdjacent && isPawn && movingDiagonally;
         return enPassantEligible;
     }
-
-    private bool IsMoveValid(ChessPiece piece, Position target, bool ignoreTurn = false) // CanMove without the check for check to prevent infinite loop
-    {
-        int deltaX = Math.Abs(target.X - piece.Position.X);
-        int deltaY = Math.Abs(target.Y - piece.Position.Y);
-        bool outOfChessboard = !InBounds(target);
-        bool pieceIllegalMove = !piece.CanMoveTo(target);
-        bool isBlocked = IsBlocked(piece, target);
-        bool castling = piece is King && deltaX == 2;
-        bool wrongTurn = piece.Color != _turn;
-        if (ignoreTurn) wrongTurn = false;
-        bool notMoving = deltaX == 0 && deltaY == 0;
-
-        if (CanEnPassant(piece, target)) // En passant is a special case
-            return true;
-
-        if (notMoving || outOfChessboard || pieceIllegalMove || isBlocked || wrongTurn ||
-            (castling && !CanCastle(piece, target)))
-            return false;
-        
-        if (piece is Pawn)
-        {
-            var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
-            bool capturing = pieceToTake != null;
-            bool sameColor = pieceToTake?.Color == piece.Color;
-            bool movingStraight = deltaX == 0;
-            bool movingDiagonally = deltaX == 1 && deltaY == 1;
-            
-            if ((movingDiagonally && (!capturing || sameColor)) || 
-                (movingStraight && capturing))
-                return false;
-        }
-        
-        // If all checks pass, the move is valid
-        return true;
-    }
-
+    
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
