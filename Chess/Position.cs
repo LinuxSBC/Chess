@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 
 namespace Chess;
 
-public class Position : IEquatable<Vector2>
+public class Position
 {
     public int X { get; set; }
     public int Y { get; set; }
@@ -13,23 +13,38 @@ public class Position : IEquatable<Vector2>
         X = x;
         Y = y;
     }
+    
+    public Position(Vector2 vector)
+    {
+        X = (int) vector.X;
+        Y = (int) vector.Y;
+    }
+    
+    public Position Copy()
+    {
+        return new Position(X, Y);
+    }
+
+    public override string ToString()
+    {
+        return X + ", " + Y;
+    }
+
+    public Vector2 ToVector2()
+    {
+        return new Vector2(X, Y);
+    }
 
     private bool Equals(Position other)
     {
         return X == other.X && Y == other.Y;
     }
 
-    public bool Equals(Vector2 other)
-    {
-        return X == (int) other.X && Y == (int) other.Y;
-    }
-
     public override bool Equals(object obj)
     {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
-        if (obj is Vector2) return Equals((Vector2) obj);
-        if (obj.GetType() != this.GetType()) return false;
+        if (obj.GetType() != GetType()) return false;
         return Equals((Position) obj);
     }
 

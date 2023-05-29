@@ -114,11 +114,11 @@ public class ChessGame : Game
         bool escapeKeyPressed = Keyboard.GetState().IsKeyDown(Keys.Escape);
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
-        var targetSquare = ToChessGrid(_mouseState.X, _mouseState.Y);
         bool holdingPiece = _pickedUpPiece != null;
         bool mouseInBoardX = _mouseState.X > 0 && _mouseState.X < _maxSize;
         bool mouseInBoardY = _mouseState.Y > 0 && _mouseState.Y < _maxSize;
         bool mouseInBoard = mouseInBoardX && mouseInBoardY;
+        Position targetSquare = ToChessGrid(_mouseState.X, _mouseState.Y);
         bool isPieceUnderMouse = _pieces.Any(p => Equals(p.Position, targetSquare));
 
         if (backButtonPressed || escapeKeyPressed)
@@ -152,19 +152,13 @@ public class ChessGame : Game
         return new Position((int) (position.X / scale), (int) (position.Y / scale));
     }
         
-    private Vector2 ToScreenSpace(Position position)
-    {
-        var scale = _maxSize / 8f;
-        return new Vector2(position.X * scale, position.Y * scale);
-    }
-    
     private Vector2 ToScreenSpace(Vector2 position)
     {
         var scale = _maxSize / 8f;
         return new Vector2(position.X * scale, position.Y * scale);
     }
     
-    private float ToChessX(float position)
+    private int ToChessX(float position)
     {
         return ToChessGrid(new Vector2(position, 0)).X;
     }
@@ -206,12 +200,14 @@ public class ChessGame : Game
 
     private bool IsStalemate()
     {
-        King king = (King) _pieces.FirstOrDefault(p => p is King && p.Color == _turn); // TODO: Loop through both kings
-        if (king == null) return false; // Shouldn't ever happen
-        Position[] possibleMoves = king.GetPossibleMoves();
-        
-        foreach (var move in possibleMoves)
-            if (CanMove(king, move)) return false;
+        foreach (var piece in _pieces)
+        {
+            if (piece is not King) continue;
+            King king = (King) piece;
+            Position[] possibleMoves = king.GetPossibleMoves();
+            foreach (var move in possibleMoves)
+                if (CanMove(king, move)) return false;
+        }
 
         return true;
     }
@@ -259,7 +255,7 @@ public class ChessGame : Game
 
     private ChessPiece RemovePiece(Position target)
     {
-        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+        var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
         if (pieceToTake is {Color: PieceColor.Black})
             _blackPieces.Remove(pieceToTake);
         else
@@ -288,10 +284,9 @@ public class ChessGame : Game
         ChessPiece pieceToTake = null;
         var willCapture = CanCapture(piece, target);
         if (willCapture)
-        {
-            if (enPassant) pieceToTake = RemovePiece(_lastMovedPiece.Position);
-            else pieceToTake = RemovePiece(target);
-        }
+            pieceToTake = RemovePiece(enPassant ? 
+                _lastMovedPiece.Position : 
+                target);
 
         var oldPosition = piece.Position;
         piece.Position = target;
@@ -319,7 +314,7 @@ public class ChessGame : Game
         Position currentRookPosition = new Position(currentRookX, king.Position.Y);
 
         var rook = _pieces.FirstOrDefault(p => 
-            p.Position == currentRookPosition && 
+            Equals(p.Position, currentRookPosition) && 
             p is Rook && 
             p.Color == king.Color && 
             !p.HasMoved);
@@ -387,15 +382,15 @@ public class ChessGame : Game
 
     private bool CanCapture(ChessPiece piece, Position target) 
     {
-        var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+        var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
         if (CanEnPassant(piece, target)) pieceToTake = _lastMovedPiece;
-        bool notCapturing = pieceToTake == null;
+        bool capturing = pieceToTake != null;
         bool sameColor = pieceToTake?.Color == piece.Color;
         bool isPawn = piece is Pawn;
         bool movingStraight = piece.Position.X == target.X;
         bool canMove = IsMoveValid(piece, target);
 
-        if (notCapturing || sameColor || !canMove ||
+        if (!capturing || sameColor || !canMove ||
             (isPawn && movingStraight))
             return false;
         
@@ -409,7 +404,7 @@ public class ChessGame : Game
         bool isKnight = piece is Knight;
         foreach (var betweenPiece in _pieces)
         {
-            bool pieceIsBetween = pointsBetween.Any(point => point == betweenPiece.Position);
+            bool pieceIsBetween = pointsBetween.Any(point => Equals(point, betweenPiece.Position));
             if (pieceIsBetween)
                 anyPieceBetween = true;
         }
@@ -420,8 +415,11 @@ public class ChessGame : Game
         return false;
     }
 
-    private static List<Position> PointsBetween(Position start, Position target)
+    private List<Position> PointsBetween(Position start, Position target)
     {
+        start = start.Copy(); // Copy the position so it doesn't get changed
+        target = target.Copy();
+        
         // Bresenham's line algorithm
         var points = new List<Position>();
 
@@ -457,7 +455,7 @@ public class ChessGame : Game
                 start.Y += signY;
             }
 
-            points.Add(start);
+            points.Add(start.Copy());
         }
 
         // Just the points between the start and end, not including the start and end
@@ -468,13 +466,12 @@ public class ChessGame : Game
     private bool CanMove(ChessPiece piece, Position target)
     {
         int deltaX = Math.Abs(target.X - piece.Position.X);
-        bool test = piece.GetType() == typeof(King);
         bool castling = piece is King && deltaX == 2;
         bool canCastle = CanCastle(piece, target);
         bool invalidMove = !IsMoveValid(piece, target);
-        ChessPiece pieceToTake;
-        if (CanEnPassant(piece, target)) pieceToTake = _lastMovedPiece;
-        else pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+        var pieceToTake = CanEnPassant(piece, target) ? 
+            _lastMovedPiece : 
+            _pieces.FirstOrDefault(p => Equals(p.Position, target));
         bool capturing = pieceToTake != null;
         bool inCheckAfterMove = InCheckAfterMove(piece, target);
 
@@ -523,7 +520,7 @@ public class ChessGame : Game
         
         if (piece is Pawn)
         {
-            var pieceToTake = _pieces.FirstOrDefault(p => p.Position == target);
+            var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
             bool capturing = pieceToTake != null;
             bool sameColor = pieceToTake?.Color == piece.Color;
             bool movingStraight = deltaX == 0;
