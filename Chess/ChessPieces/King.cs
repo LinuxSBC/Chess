@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace Chess.ChessPieces;
@@ -9,35 +10,24 @@ public class King : ChessPiece
 
     public override bool CanMoveTo(Position target)
     {
+        if (OutOfBounds(target)) return false;
         int deltaX = Math.Abs(Position.X - target.X);
         int deltaY = Math.Abs(Position.Y - target.Y);
+        if (deltaX == 0 && deltaY == 0) return false;
 
         return deltaX <= 1 && deltaY <= 1;
     }
     
-    public Position[] GetPossibleMoves()
+    public override List<Position> GetPossibleMoves()
     {
-        const int minX = 0;
-        const int maxX = 7;
-        const int minY = 0;
-        const int maxY = 7;
-
-        Position[] possibleMoves = new Position[8];
-        int index = 0;
-        
+        List<Position> possibleMoves = new List<Position>();
         for (int deltaX = -1; deltaX <= 1; deltaX++)
         {
             for (int deltaY = -1; deltaY <= 1; deltaY++)
             {
                 Position newPosition = new Position(Position.X + deltaX, Position.Y + deltaY);
                 
-                bool outOfBoundsX = newPosition.X is < minX or > maxX;
-                bool outOfBoundsY = newPosition.Y is < minY or > maxY;
-                bool outOfBounds = outOfBoundsX || outOfBoundsY;
-                bool samePosition = deltaX == 0 && deltaY == 0;
-                
-                if (outOfBounds || samePosition) continue;
-                possibleMoves[index++] = newPosition;
+                if (CanMoveTo(newPosition)) possibleMoves.Add(newPosition);
             }
         }
 

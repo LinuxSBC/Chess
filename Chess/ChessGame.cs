@@ -187,26 +187,57 @@ public class ChessGame : Game
         
         MovePiece(piece, target);
 
-        if (ShouldPromotePawn(piece)) piece = PromotePawn(piece);
+        if (ShouldPromotePawn(piece)) PromotePawn(piece);
 
-        // if (IsCheckmate()) ShowCheckmatePrompt(); // CheckmatePrompt will be a standard MonoGame text box
+        if (IsCheckmate()) ShowCheckmatePrompt(); // CheckmatePrompt will be a standard MonoGame text box
         
-        // if (IsStalemate()) ShowStalematePrompt();
+        if (IsStalemate()) ShowStalematePrompt();
 
         if (changeTurn) ChangeTurn();
+    }
+
+    private void ShowCheckmatePrompt()
+    {
+        PieceColor winningColor = _lastMovedPiece.Color;
+        Console.WriteLine($"Checkmate! {winningColor} wins!");
+    }
+
+    private void ShowStalematePrompt()
+    {
+        Console.WriteLine("Stalemate!");
+    }
+
+    private bool IsCheckmate()
+    {
+        // You can't move into check, so the last moved piece is never the one to lose
+        PieceColor checkmatedColor = _lastMovedPiece.Color == PieceColor.Black ? PieceColor.White : PieceColor.Black;
         
-        // TODO: Add checkmate dialog
+        if (!InCheck(checkmatedColor)) return false;
+        return AnyPossibleMoves(checkmatedColor);
     }
 
     private bool IsStalemate()
     {
-        foreach (var piece in _pieces)
+        return IsStalemate(PieceColor.Black) || IsStalemate(PieceColor.White);
+    }
+    
+    private bool IsStalemate(PieceColor color)
+    {
+        if (InCheck(color)) return false;
+
+        return AnyPossibleMoves(color);
+    }
+
+    private bool AnyPossibleMoves(PieceColor color)
+    {
+        var pieces = color == PieceColor.Black ? _blackPieces : _whitePieces;
+
+        foreach (var piece in pieces)
         {
-            if (piece is not King) continue;
-            King king = (King) piece;
-            Position[] possibleMoves = king.GetPossibleMoves();
+            var possibleMoves = piece.GetPossibleMoves();
             foreach (var move in possibleMoves)
-                if (CanMove(king, move)) return false;
+                if (CanMove(piece, move, ignoreTurn: true))
+                    return false;
         }
 
         return true;
@@ -276,13 +307,13 @@ public class ChessGame : Game
         _pieces.Add(piece);
     }
 
-    private bool InCheckAfterMove(ChessPiece piece, Position target)
+    private bool InCheckAfterMove(ChessPiece piece, Position target, bool ignoreTurn = false)
     {
         bool enPassant = CanEnPassant(piece, target);
         
         // Perform the move
         ChessPiece pieceToTake = null;
-        var willCapture = CanCapture(piece, target);
+        var willCapture = CanCapture(piece, target, ignoreTurn);
         if (willCapture)
             pieceToTake = RemovePiece(enPassant ? 
                 _lastMovedPiece.Position : 
@@ -290,14 +321,14 @@ public class ChessGame : Game
 
         var oldPosition = piece.Position;
         piece.Position = target;
-        ChangeTurn();
+        if (!ignoreTurn) ChangeTurn();
         
         // Check if the move puts the player in check
         var inCheck = InCheck(piece.Color);
         
         // Undo the move
         piece.Position = oldPosition;
-        ChangeTurn();
+         if (!ignoreTurn) ChangeTurn();
         
         if (willCapture)
             AddPiece(pieceToTake);
@@ -373,14 +404,14 @@ public class ChessGame : Game
         return inRank && inFile;
     }
     
-    private bool InCheck(PieceColor color)
+    private bool InCheck(PieceColor color, bool ignoreTurn = false)
     {
         var king = _pieces.FirstOrDefault(p => p is King && p.Color == color);
         if (king == null) return false; // shouldn't happen because there is always a king unless the game is over
-        return _pieces.Any(p => CanCapture(p, king.Position));
+        return _pieces.Any(p => CanCapture(p, king.Position, ignoreTurn));
     }
 
-    private bool CanCapture(ChessPiece piece, Position target) 
+    private bool CanCapture(ChessPiece piece, Position target, bool ignoreTurn = false) 
     {
         var pieceToTake = _pieces.FirstOrDefault(p => Equals(p.Position, target));
         if (CanEnPassant(piece, target)) pieceToTake = _lastMovedPiece;
@@ -388,7 +419,7 @@ public class ChessGame : Game
         bool sameColor = pieceToTake?.Color == piece.Color;
         bool isPawn = piece is Pawn;
         bool movingStraight = piece.Position.X == target.X;
-        bool canMove = IsMoveValid(piece, target);
+        bool canMove = IsMoveValid(piece, target, ignoreTurn);
 
         if (!capturing || sameColor || !canMove ||
             (isPawn && movingStraight))
@@ -463,20 +494,20 @@ public class ChessGame : Game
         return points;
     }
 
-    private bool CanMove(ChessPiece piece, Position target)
+    private bool CanMove(ChessPiece piece, Position target, bool ignoreTurn = false)
     {
         int deltaX = Math.Abs(target.X - piece.Position.X);
         bool castling = piece is King && deltaX == 2;
         bool canCastle = CanCastle(piece, target);
-        bool invalidMove = !IsMoveValid(piece, target);
+        bool invalidMove = !IsMoveValid(piece, target, ignoreTurn);
         var pieceToTake = CanEnPassant(piece, target) ? 
             _lastMovedPiece : 
             _pieces.FirstOrDefault(p => Equals(p.Position, target));
         bool capturing = pieceToTake != null;
-        bool inCheckAfterMove = InCheckAfterMove(piece, target);
+        bool inCheckAfterMove = InCheckAfterMove(piece, target, ignoreTurn);
 
         if (invalidMove || inCheckAfterMove ||
-            (capturing && !CanCapture(piece, target)) ||
+            (capturing && !CanCapture(piece, target, ignoreTurn)) ||
             (castling && !canCastle))
             return false;
         return true;
@@ -500,7 +531,7 @@ public class ChessGame : Game
         return enPassantEligible;
     }
 
-    private bool IsMoveValid(ChessPiece piece, Position target) // CanMove without the check for check to prevent infinite loop
+    private bool IsMoveValid(ChessPiece piece, Position target, bool ignoreTurn = false) // CanMove without the check for check to prevent infinite loop
     {
         int deltaX = Math.Abs(target.X - piece.Position.X);
         int deltaY = Math.Abs(target.Y - piece.Position.Y);
@@ -509,6 +540,7 @@ public class ChessGame : Game
         bool isBlocked = IsBlocked(piece, target);
         bool castling = piece is King && deltaX == 2;
         bool wrongTurn = piece.Color != _turn;
+        if (ignoreTurn) wrongTurn = false;
         bool notMoving = deltaX == 0 && deltaY == 0;
 
         if (CanEnPassant(piece, target)) // En passant is a special case
