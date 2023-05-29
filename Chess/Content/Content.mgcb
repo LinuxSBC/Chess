@@ -97,6 +97,13 @@
 /processorParam:TextureFormat=Color
 /build:ChessBoard.png
 
+#begin Fonts/Cantarell-Regular.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/processorParam:PremultiplyAlpha=True
+/processorParam:TextureFormat=Compressed
+/build:Fonts/Cantarell-Regular.spritefont
+
 #begin WhiteBishop.png
 /importer:TextureImporter
 /processor:TextureProcessor

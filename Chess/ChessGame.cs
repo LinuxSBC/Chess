@@ -22,10 +22,12 @@ public class ChessGame : Game
     private List<ChessPiece> _whitePieces;
     private List<ChessPiece> _pieces;
 
-    private int _maxSize;
+    private int _boardWidth;
 
     public GraphicsDeviceManager Graphics { get; }
     private SpriteBatch _spriteBatch;
+    
+    private SpriteFont _font;
 
     private ChessPiece _pickedUpPiece;
     private MouseState _mouseState;
@@ -34,6 +36,9 @@ public class ChessGame : Game
     
     private bool _lastMoveEnPassantEligible;
     private ChessPiece _lastMovedPiece;
+
+    private String _endMessage = "";
+    private bool _gameOver = false;
     
     public ChessGame()
     {
@@ -54,6 +59,8 @@ public class ChessGame : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
+        
+        _font = Content.Load<SpriteFont>("Fonts/Cantarell-Regular");
         
         _chessBoard = Content.Load<Texture2D>("ChessBoard");
         
@@ -117,8 +124,8 @@ public class ChessGame : Game
         _mouseState = Mouse.GetState();
         var mouseClicked = _mouseState.LeftButton == ButtonState.Pressed;
         bool holdingPiece = _pickedUpPiece != null;
-        bool mouseInBoardX = _mouseState.X > 0 && _mouseState.X < _maxSize;
-        bool mouseInBoardY = _mouseState.Y > 0 && _mouseState.Y < _maxSize;
+        bool mouseInBoardX = _mouseState.X > 0 && _mouseState.X < _boardWidth;
+        bool mouseInBoardY = _mouseState.Y > 0 && _mouseState.Y < _boardWidth;
         bool mouseInBoard = mouseInBoardX && mouseInBoardY;
         Position targetSquare = ToChessGrid(new Vector2(_mouseState.X, _mouseState.Y));
         bool isPieceUnderMouse = _pieces.Any(p => Equals(p.Position, targetSquare));
@@ -150,17 +157,22 @@ public class ChessGame : Game
 
     private Position ToChessGrid(Vector2 position)
     {
-        var scale = _maxSize / 8f;
+        var scale = _boardWidth / 8f;
         return new Position((int) (position.X / scale), (int) (position.Y / scale));
     }
     
     private Vector2 ToScreenSpace(Vector2 position)
     {
-        var scale = _maxSize / 8f;
+        var scale = _boardWidth / 8f;
         return new Vector2(position.X * scale, position.Y * scale);
     }
+    
+    private Vector2 ToScreenSpace(Position position)
+    {
+        return ToScreenSpace(new Vector2(position.X, position.Y));
+    }
 
-    private float ToScreenX(float position)
+    private float ToScreenSpace(float position)
     {
         return ToScreenSpace(new Vector2(position, 0)).X;
     }
@@ -185,13 +197,17 @@ public class ChessGame : Game
 
     private void ShowCheckmatePrompt()
     {
+        _gameOver = true;
         PieceColor winningColor = _lastMovedPiece.Color;
-        Console.WriteLine($"Checkmate! {winningColor} wins!");
+        _endMessage = $"Checkmate! {winningColor} wins!";
+        Console.WriteLine(_endMessage);
     }
 
     private void ShowStalematePrompt()
     {
-        Console.WriteLine("Stalemate!");
+        _gameOver = true;
+        _endMessage = "Stalemate!";
+        Console.WriteLine(_endMessage);
     }
 
     private bool IsCheckmate()
@@ -561,49 +577,88 @@ public class ChessGame : Game
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
-        _maxSize = (Window.ClientBounds.Height > Window.ClientBounds.Width) switch
+        _boardWidth = (Window.ClientBounds.Height > Window.ClientBounds.Width) switch
         {
             true => Window.ClientBounds.Width,
             false => Window.ClientBounds.Height
         };
         
         _spriteBatch.Begin(SpriteSortMode.FrontToBack);
-        _spriteBatch.Draw(_chessBoard, 
-            new Rectangle(0, 0, _maxSize, _maxSize), 
-            null, 
-            Color.White, 
-            0f, 
-            new Vector2(0, 0), 
-            SpriteEffects.None, 
-            0f);
+        
+        DrawChessBoard();
         foreach (var piece in _pieces)
         {
-            if (!piece.BeingDragged)
-                _spriteBatch.Draw(piece.Texture,
-                    new Rectangle((int) ToScreenX(piece.Position.X), 
-                        (int) ToScreenX(piece.Position.Y), 
-                        (int) ToScreenX(1), (int) ToScreenX(1)),
-                    null,
-                    Color.White,
-                    0f,
-                    new Vector2(0, 0),
-                    SpriteEffects.None,
-                    0.1f);
+            if (piece.BeingDragged)
+                DrawDraggedPiece(piece);
             else
-                _spriteBatch.Draw(piece.Texture,
-                    new Rectangle(_mouseState.X - (int) ToScreenX(0.5f), 
-                        _mouseState.Y - (int) ToScreenX(0.5f), 
-                        (int) ToScreenX(1), (int) ToScreenX(1)),
-                    null,
-                    Color.White,
-                    0f,
-                    new Vector2(0, 0),
-                    SpriteEffects.None,
-                    1f);
+                DrawFixedPiece(piece);
         }
+
+        if (_gameOver)
+            DrawCenteredString(_endMessage, Color.Purple, 2F / 3F);
 
         _spriteBatch.End();
         
         base.Draw(gameTime);
+    }
+
+    private void DrawFixedPiece(ChessPiece piece, float layer = .1f)
+    {
+        int pieceWidth = (int) ToScreenSpace(1);
+        Point piecePosition = ToScreenSpace(piece.Position).ToPoint();
+        Point pieceSize = new Point(pieceWidth, pieceWidth);
+
+        var destinationSquare = new Rectangle(piecePosition, pieceSize);
+        _spriteBatch.Draw(piece.Texture,
+            destinationSquare,
+            null,
+            Color.White,
+            0f,
+            new Vector2(0, 0),
+            SpriteEffects.None,
+            layer);
+    }
+
+    private void DrawDraggedPiece(ChessPiece piece, float layer = .2f)
+    {
+        // Draw the piece centered on the mouse
+        int pieceWidth = (int) ToScreenSpace(1);
+        int pieceLeft = _mouseState.X - (int) (pieceWidth / 2F);
+        int pieceTop = _mouseState.Y - (int) (pieceWidth / 2F);
+        Point piecePosition = new Point(pieceLeft, pieceTop);
+        Point pieceSize = new Point(pieceWidth, pieceWidth);
+        
+        var destinationSquare = new Rectangle(piecePosition, pieceSize);
+        _spriteBatch.Draw(piece.Texture,
+            destinationSquare,
+            null,
+            Color.White,
+            0f,
+            new Vector2(0, 0),
+            SpriteEffects.None,
+            layer);
+    }
+
+    private void DrawChessBoard(float layer = 0)
+    {
+        _spriteBatch.Draw(_chessBoard,
+            new Rectangle(0, 0, _boardWidth, _boardWidth),
+            null,
+            Color.White,
+            0f,
+            new Vector2(0, 0),
+            SpriteEffects.None,
+            layer);
+    }
+
+    private void DrawCenteredString(string text, Color color, float fractionOfBoard, float layer = 1f)
+    {
+        var messageSize = _font.MeasureString(_endMessage);
+        var scale = fractionOfBoard * _boardWidth / messageSize.X;
+        var messageScale = new Vector2(scale, scale);
+        var newMessageSize = messageSize * messageScale;
+        var center = new Vector2(_boardWidth / 2F, _boardWidth / 2F);
+        var messagePosition = center - newMessageSize / 2F;
+        _spriteBatch.DrawString(_font, text, messagePosition, color, 0f, Vector2.Zero, messageScale, SpriteEffects.None, layer);
     }
 }
